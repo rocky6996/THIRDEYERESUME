@@ -1,17 +1,13 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image
 import google.generativeai as genai
-from pdf2image import convert_from_path
-import pytesseract
 import pdfplumber
-from io import BytesIO
+from PyPDF2 import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 import re
-import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -46,21 +42,24 @@ def show_career_resources():
 def extract_text_from_pdf(pdf_path):
     text = ""
     try:
+        # Try pdfplumber first
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
-        if text.strip():
-            return text.strip()
     except Exception as e:
-        print(f"Direct text extraction failed: {e}")
-    try:
-        images = convert_from_path(pdf_path)
-        for image in images:
-            text += pytesseract.image_to_string(image) + "\n"
-    except Exception as e:
-        print(f"OCR failed: {e}")
+        st.warning(f"Primary extraction failed, trying backup method...")
+        try:
+            # Fallback to PyPDF2
+            with open(pdf_path, 'rb') as file:
+                pdf_reader = PdfReader(file)
+                for page in pdf_reader.pages:
+                    text += page.extract_text() or ""
+        except Exception as e:
+            st.error(f"PDF text extraction failed. Please make sure the PDF is not encrypted or corrupted.")
+            return ""
+    
     return text.strip()
 
 # Function to analyze resume with Gemini AI
